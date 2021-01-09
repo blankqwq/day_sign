@@ -1,0 +1,28 @@
+name: Github Wozai bot
+
+on:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: '10 0,7,17 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@v2
+      - name: Use Python 3.8
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.8'
+      - name: Install requirements
+        run: pip install -r requirements.txt
+      - run: python main.py
+        env:
+          TOKEN: ${{ secrets.TOKEN }}
+          ADDRESS: ${{ secrets.ADDRESS }}
+          SESSION: ${{ secrets.SESSION }}
+          PUBLISH_KEY: ${{ secrets.PUBLISH_KEY }}
