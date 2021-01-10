@@ -2,22 +2,14 @@ import requests
 import os
 import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    filemode='w',
-    filename='current.txt',
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-)
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-
+# 组要变量
 TOKEN = os.getenv("TOKEN").strip() if os.getenv("TOKEN") is not None else ''
 SESSION = os.getenv("SESSION").strip() if os.getenv("SESSION") is not None else ''
 ADDRESS = os.getenv("ADDRESS").strip() if os.getenv("ADDRESS") is not None else ''
 PUBLISH_KEY = os.getenv("PUBLISH_KEY").strip() if os.getenv("PUBLISH_KEY") is not None else ''
 
 host = "https://student.wozaixiaoyuan.com"
-# 头部信息，只需要修改token值
+# 请求头部信息
 headers = {
     "Host": "student.wozaixiaoyuan.com",
     "Connection": "keep-alive",
@@ -28,16 +20,22 @@ headers = {
     "token": f"{TOKEN}"
 }
 
+logging.basicConfig(
+    level=logging.INFO,
+    filemode='w',
+    filename='current.txt',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+
 
 def getAddr(addr):
     keys = ['latitude', 'longitude', 'country', 'province', 'city', 'district', 'township', 'street', 'areacode']
     return dict(zip(keys, addr.split('|')))
 
 
-addressData = getAddr(ADDRESS)
-
-
-def getSignMessage(doSigning=True):
+def signMessage(doSigning=True):
     url = "/sign/getSignMessage.json"
     data = {
         "page": 1,
@@ -49,18 +47,18 @@ def getSignMessage(doSigning=True):
     if resData['code'] == 0:
         if doSigning:
             reqData = resData['data'][0]
-            doSign(reqData)
-        else:
-            return resData["data"]
+            return doSign(reqData)
+        return True
     else:
         logger.error(f"获取签到内容 -- 失败")
+    return False
 
 
 def doSign(reqData):
     logger.info(f"{reqData['title']} -- 开始签到")
     if reqData['type']:
         logger.info(f"{reqData['title']} -- 已签到，跳过签到流程")
-        return
+        return True
     url = "/sign/doSign.json"
     data = {
         "id": reqData['logId'],
@@ -76,22 +74,25 @@ def doSign(reqData):
     res = requests.post(host + url, headers=headers, json=data).json()
     if res['code'] == 0:
         logger.info(f"{reqData['title']} -- 签到成功!!")
+        return True
     else:
-        logger.error(f"健康签到失败：{res}")
+        logger.error(f"{reqData['title']} -- 签到失败：{res}")
+        return False
 
 
-def healty():
+def healthy():
     url = "/health/getToday.json"
     res = requests.post(host + url, headers=headers).json()
     if res['code'] != 0:
-        logger.error(f'异常错误')
-        return
+        logger.error(f'异常错误:{res}')
+        return False
     country = res['data'].get('country')
     if country == '' or country is None:
-        logger.info(f'开始签到')
-        saveHealth()
+        logger.info(f'开始健康打卡')
+        return saveHealth()
     else:
-        logger.error(f'已签到跳过签到')
+        logger.error(f'已打卡,跳过健康打卡')
+        return True
 
 
 def saveHealth():
@@ -111,9 +112,11 @@ def saveHealth():
     }
     res = requests.post(host + url, headers=headers, data=data).json()
     if res['code'] == 0:
-        logger.info(f"健康签到成功{res}")
+        logger.info(f"健康打卡成功")
+        return True
     else:
-        logger.error(f"健康签到失败:{res}")
+        logger.error(f"健康打卡失败:{res}")
+        return False
 
 
 def getUserInfo():
@@ -122,25 +125,32 @@ def getUserInfo():
     return res['code'] == 0, res['data']
 
 
-def notify(content):
-    url = f'https://sc.ftqq.com/{PUBLISH_KEY.strip()}.send'
-    requests.get(url, params={"text": "我在校园打卡", "desp": content})
+def notify(content, title="我在校园打卡信息"):
+    if PUBLISH_KEY is not None or PUBLISH_KEY != '':
+        url = f'https://sc.ftqq.com/{PUBLISH_KEY}.send'
+        requests.get(url, params={"text": title, "desp": content})
+    else:
+        print("请输入提醒KEY,开启提醒!!", content)
+
+
+def funcToStr(b, title=''):
+    return f'{title}:成功' if b() else f'{title}:失败'
 
 
 def main():
     infoOk, userInfo = getUserInfo()
     if infoOk:
-        getSignMessage()
-        healty()
+        title = f'我在校园打卡[{funcToStr(signMessage,"签到")}][{funcToStr(healthy,"打卡")}]'
         with open('./current.txt', 'r') as f:
             result = f"```\n姓名: {userInfo['name']}\n{f.read()}\n```"
     else:
-        result = '签到失败,信息过期或错误'
-    if PUBLISH_KEY is not None or PUBLISH_KEY != '':
-        notify(result)
-    else:
-        print("请输入提醒KEY")
+        title = '我在校园打卡信息已过期!'
+        result = f'签到失败,信息过期或错误\n{userInfo}'
+    #     发送提醒
+    notify(result, title)
 
 
 if __name__ == "__main__":
+    # 格式化地址信息
+    addressData = getAddr(ADDRESS)
     main()
