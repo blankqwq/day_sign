@@ -140,7 +140,7 @@ def funcToStr(b, title=''):
 def main():
     infoOk, userInfo = getUserInfo()
     if infoOk:
-        title = f'我在校园打卡[{funcToStr(signMessage,"签到")}][{funcToStr(healthy,"打卡")}]'
+        title = f'我在校园【{funcToStr(signMessage,"签到")}】【{funcToStr(healthy,"打卡")}】'
         with open('./current.txt', 'r') as f:
             result = f"```\n姓名: {userInfo['name']}\n{f.read()}\n```"
     else:
