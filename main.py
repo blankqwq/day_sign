@@ -122,7 +122,8 @@ def saveHealth():
 def getUserInfo():
     url = '/my/getUserInfo.json'
     res = requests.post(host + url, headers=headers).json()
-    return res['code'] == 0, res['data']
+    data = res.get('data')
+    return res['code'] == 0 and data is not None, data
 
 
 def notify(content, title="我在校园打卡信息"):
@@ -140,7 +141,7 @@ def funcToStr(b, title=''):
 def main():
     infoOk, userInfo = getUserInfo()
     if infoOk:
-        title = f'我在校园|={funcToStr(signMessage,"签到")}|={funcToStr(healthy,"打卡")}'
+        title = f'我在校园 {funcToStr(signMessage,"签到")}{funcToStr(healthy,"打卡")}'
         with open('./current.txt', 'r') as f:
             result = f"```\n姓名: {userInfo['name']}\n{f.read()}\n```"
     else:
